@@ -12,5 +12,5 @@ import { getContractForEnvironment } from './utils/getContractForEnvironment';
 import { BigNumber } from '@ethersproject/bignumber';
 
 const setup = deployments.createFixture(async () => {
-  await deployments.fixture('ParadiseMainBridge');
+  await deployments.fixture('ParadiseBridge');
 });

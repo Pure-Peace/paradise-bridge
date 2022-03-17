@@ -79,7 +79,10 @@ const config = {
     ropsten: {
       url: node_url('ropsten'),
       accounts: accounts('ropsten'),
-
+    },
+    paradise: {
+      url: node_url('paradise'),
+      accounts: accounts('paradise'),
     }
   },
   etherscan: {

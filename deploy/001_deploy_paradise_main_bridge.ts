@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
 import { genGetContractWith } from '../test/utils/genHelpers';
-import { ParadiseMainBridge } from '../typechain/ParadiseMainBridge';
+import { ParadiseBridge } from '../typechain/ParadiseBridge';
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
@@ -9,21 +9,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const { deployer } = await getNamedAccounts();
 
-  const mainBridgeDeployments = await deploy('ParadiseMainBridge', {
+  const mainBridgeDeployments = await deploy('ParadiseBridge', {
     from: deployer,
-    contract: 'ParadiseMainBridge',
+    contract: 'ParadiseBridge',
     args: [],
     log: true,
     skipIfAlreadyDeployed: false,
     gasLimit: 5500000,
   });
   const { getContractAt } = genGetContractWith(hre);
-  const mainBridge = await getContractAt<ParadiseMainBridge>(
-    'ParadiseMainBridge',
+  const mainBridge = await getContractAt<ParadiseBridge>(
+    'ParadiseBridge',
     mainBridgeDeployments.address,
     deployer
   );
 };
 export default func;
 func.id = 'deploy_paradise_main_bridge';
-func.tags = ['ParadiseMainBridge'];
+func.tags = ['ParadiseBridge'];

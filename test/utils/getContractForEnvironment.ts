@@ -25,8 +25,8 @@ function generateEnvNameContractDefHelper(networkToContract: { [networkName: str
 
 }
 const DEF_GET_CONTRACT_FOR_ENVIRONMENT = {
-  "ParadiseMainBridge": generateEnvNameContractDefHelper({
-    "hardhat": "ParadiseMainBridge",
+  "ParadiseBridge": generateEnvNameContractDefHelper({
+    "hardhat": "ParadiseBridge",
   }),
   "TestPDT": generateEnvNameContractDefHelper({
     "hardhat": "TestPDT",

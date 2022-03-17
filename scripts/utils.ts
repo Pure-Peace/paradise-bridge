@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-var-requires */
 import hre from 'hardhat';
-import { Contract, ContractTransaction, Signer } from 'ethers';
+import { BigNumber, Contract, ContractTransaction, Signer } from 'ethers';
 import { DeployResult } from 'hardhat-deploy/types';
 import fs from 'fs';
 import path from 'path';
@@ -9,6 +9,8 @@ import path from 'path';
 import { GAS_LIMIT } from './constants';
 import { getContractForEnvironment } from '../test/utils/getContractForEnvironment';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { ParadiseBridge } from '../typechain/ParadiseBridge';
+
 
 import {
   ContractList,
@@ -267,26 +269,102 @@ export async function deployBeaconProxy(
   return results;
 }
 
-export async function deployContracts(deploy: DeployFunction) {
-  console.log('\n>>>>>>>>> Deploying contracts...\n');
+export async function getDeployedContracts(
+  deployer: SignerWithAddress
+) {
+  console.log('\n>>>>>>>>> Getting deployed contracts...\n');
+  const ParadiseBridge = await getContractForEnvironment<ParadiseBridge>(
+    hre,
+    'ParadiseBridge',
+    deployer
+  );
+
+  return { ParadiseBridge };
+}
+
+export async function deployContractsEthereumSide(deploy: DeployFunction) {
+  console.log('\n>>>>>>>>> Deploying contracts EthereumSide...\n');
 
   const TestPDTDepResult = await deploy('TestPDT', 'TestPDT');
-  const ParadiseMainBridgeDepResult = await deploy(
-    'ParadiseMainBridge',
-    'ParadiseMainBridge',
-    [TestPDTDepResult.address, deployConfig().gatewayAddress]
+  const ParadiseBridgeDepResult = await deploy(
+    'ParadiseBridge',
+    'ParadiseBridge',
+    [true]
   );
 
   return {
     TestPDTDepResult,
-    ParadiseMainBridgeDepResult,
+    ParadiseBridgeDepResult,
   };
+}
+
+const NETWORK_DEPLOYS = {
+  'rinkeby': deployAndSetupContractsEthereumSide,
+  'paradise': deployAndSetupContractsParadiseSide
 }
 
 
 
 export async function deployAndSetupContracts() {
+  const deployFunction = (NETWORK_DEPLOYS as any)[hre.network.name]
+  if (!deployFunction) throw new Error(`Invalid network ${hre.network.name}`)
+  await deployFunction()
+}
+
+async function deployAndSetupContractsEthereumSide() {
+  console.log('<deployAndSetupContractsEthereumSide>')
   const { deployer, deploy } = await setup();
-  const deployments = await deployContracts(deploy);
+  const deployments = await deployContractsEthereumSide(deploy);
+  const deployedContracts = await getDeployedContracts(deployer);
+  const { ParadiseBridge } = deployedContracts
+  console.log('addBridgeableTokens...')
+  await waitContractCall(await ParadiseBridge.addBridgeableTokens([deployments.TestPDTDepResult.address], [{
+    enabled: true,
+    burn: false,
+    minBridgeAmount: 0,
+    maxBridgeAmount: BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
+    bridgeFee: 0
+  }]))
+  console.log('>>> CONTRACTS SETUP DONE <<<');
+}
+
+export async function deployContractsParadiseSide(deploy: DeployFunction) {
+  console.log('\n>>>>>>>>> Deploying contracts ParadiseSide...\n');
+
+  const ParadiseBridgeDepResult = await deploy(
+    'ParadiseBridge',
+    'ParadiseBridge',
+    [true]
+  );
+
+  return {
+    ParadiseBridgeDepResult,
+  };
+}
+
+async function deployAndSetupContractsParadiseSide() {
+  console.log('<deployAndSetupContractsParadiseSide>')
+  const { deployer, deploy } = await setup();
+  const deployments = await deployContractsParadiseSide(deploy);
+  const deployedContracts = await getDeployedContracts(deployer);
+  const { ParadiseBridge } = deployedContracts
+  console.log('setBridgeToNativeApprovalStatus...')
+  await waitContractCall(await ParadiseBridge.setBridgeToNativeApprovalStatus(true))
+
+  console.log('grantRole...')
+  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
+  await waitContractCall(await ParadiseBridge.grantRole(approverRole, deployer.address))
+
+  console.log('setNativeTokensBridgeConfig...')
+  await waitContractCall(await ParadiseBridge.setNativeTokensBridgeConfig({
+    enabled: true,
+    burn: false,
+    minBridgeAmount: 0,
+    maxBridgeAmount: BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
+    bridgeFee: 0
+  }))
+
+  console.log('deposit paradise...')
+  await waitContractCall(await ParadiseBridge.depositNativeTokens({ value: BigNumber.from(100_0000).mul(BigNumber.from(10).pow(18)) }))
   console.log('>>> CONTRACTS SETUP DONE <<<');
 }
