@@ -2,7 +2,6 @@
 import { BigNumber, BigNumberish } from "ethers";
 
 export type DeployConfig = {
-  gatewayAddress: string;
 }
 
 const toTokenAmount = (amount: BigNumberish, tokenDecimal: BigNumberish) => {
@@ -10,9 +9,7 @@ const toTokenAmount = (amount: BigNumberish, tokenDecimal: BigNumberish) => {
 }
 
 const config: { [key: string]: DeployConfig } = {
-  'rinkeby': {
-    gatewayAddress: '0xFfE41F21961B75cb96C833d34164b1463A167EF0'
-  }
+
 }
 
 export default config;

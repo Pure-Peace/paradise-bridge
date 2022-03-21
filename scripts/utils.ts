@@ -11,7 +11,6 @@ import { getContractForEnvironment } from '../test/utils/getContractForEnvironme
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ParadiseBridge } from '../typechain/ParadiseBridge';
 
-
 import {
   ContractList,
   IMPL_PREFIX,
@@ -269,9 +268,7 @@ export async function deployBeaconProxy(
   return results;
 }
 
-export async function getDeployedContracts(
-  deployer: SignerWithAddress
-) {
+export async function getDeployedContracts(deployer: SignerWithAddress) {
   console.log('\n>>>>>>>>> Getting deployed contracts...\n');
   const ParadiseBridge = await getContractForEnvironment<ParadiseBridge>(
     hre,
@@ -292,39 +289,50 @@ export async function deployContractsEthereumSide(deploy: DeployFunction) {
     [true]
   );
 
+
   return {
     TestPDTDepResult,
     ParadiseBridgeDepResult,
   };
 }
 
+
+
 const NETWORK_DEPLOYS = {
-  'rinkeby': deployAndSetupContractsEthereumSide,
-  'paradise': deployAndSetupContractsParadiseSide
-}
-
-
+  rinkeby: deployAndSetupContractsEthereumSide,
+  paradise: deployAndSetupContractsParadiseSide,
+  bsctest: deployAndSetupContractsBSCSide
+};
 
 export async function deployAndSetupContracts() {
-  const deployFunction = (NETWORK_DEPLOYS as any)[hre.network.name]
-  if (!deployFunction) throw new Error(`Invalid network ${hre.network.name}`)
-  await deployFunction()
+  const deployFunction = (NETWORK_DEPLOYS as any)[hre.network.name];
+  if (!deployFunction) throw new Error(`Invalid network ${hre.network.name}`);
+  await deployFunction();
 }
 
 async function deployAndSetupContractsEthereumSide() {
-  console.log('<deployAndSetupContractsEthereumSide>')
+  console.log('<deployAndSetupContractsEthereumSide>');
   const { deployer, deploy } = await setup();
   const deployments = await deployContractsEthereumSide(deploy);
   const deployedContracts = await getDeployedContracts(deployer);
-  const { ParadiseBridge } = deployedContracts
-  console.log('addBridgeableTokens...')
-  await waitContractCall(await ParadiseBridge.addBridgeableTokens([deployments.TestPDTDepResult.address], [{
-    enabled: true,
-    burn: false,
-    minBridgeAmount: 0,
-    maxBridgeAmount: BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
-    bridgeFee: 0
-  }]))
+  const { ParadiseBridge } = deployedContracts;
+  console.log('addBridgeableTokens...');
+  await waitContractCall(
+    await ParadiseBridge.addBridgeableTokens(
+      [deployments.TestPDTDepResult.address],
+      [
+        {
+          enabled: true,
+          burn: false,
+          minBridgeAmount: 0,
+          maxBridgeAmount: BigNumber.from(
+            '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+          ),
+          bridgeFee: 0,
+        },
+      ]
+    )
+  );
   console.log('>>> CONTRACTS SETUP DONE <<<');
 }
 
@@ -343,28 +351,90 @@ export async function deployContractsParadiseSide(deploy: DeployFunction) {
 }
 
 async function deployAndSetupContractsParadiseSide() {
-  console.log('<deployAndSetupContractsParadiseSide>')
+  console.log('<deployAndSetupContractsParadiseSide>');
   const { deployer, deploy } = await setup();
   const deployments = await deployContractsParadiseSide(deploy);
   const deployedContracts = await getDeployedContracts(deployer);
-  const { ParadiseBridge } = deployedContracts
-  console.log('setBridgeToNativeApprovalStatus...')
-  await waitContractCall(await ParadiseBridge.setBridgeToNativeApprovalStatus(true))
+  const { ParadiseBridge } = deployedContracts;
+  console.log('setBridgeToNativeApprovalStatus...');
+  await waitContractCall(
+    await ParadiseBridge.setBridgeToNativeApprovalStatus(true)
+  );
 
-  console.log('grantRole...')
+  console.log('grantRole...');
   const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
-  await waitContractCall(await ParadiseBridge.grantRole(approverRole, deployer.address))
+  await waitContractCall(
+    await ParadiseBridge.grantRole(approverRole, deployer.address)
+  );
 
-  console.log('setNativeTokensBridgeConfig...')
-  await waitContractCall(await ParadiseBridge.setNativeTokensBridgeConfig({
-    enabled: true,
-    burn: false,
-    minBridgeAmount: 0,
-    maxBridgeAmount: BigNumber.from('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
-    bridgeFee: 0
-  }))
+  console.log('setNativeTokensBridgeConfig...');
+  await waitContractCall(
+    await ParadiseBridge.setNativeTokensBridgeConfig({
+      enabled: true,
+      burn: false,
+      minBridgeAmount: 0,
+      maxBridgeAmount: BigNumber.from(
+        '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+      ),
+      bridgeFee: 0,
+    })
+  );
 
-  console.log('deposit paradise...')
-  await waitContractCall(await ParadiseBridge.depositNativeTokens({ value: BigNumber.from(100_0000).mul(BigNumber.from(10).pow(18)) }))
+  console.log('deposit paradise...');
+  await waitContractCall(
+    await ParadiseBridge.depositNativeTokens({
+      value: BigNumber.from(100_0000).mul(BigNumber.from(10).pow(18)),
+    })
+  );
+  console.log('>>> CONTRACTS SETUP DONE <<<');
+}
+
+
+export async function deployContractsBSCSide(deploy: DeployFunction) {
+  console.log('\n>>>>>>>>> Deploying contracts BSC side...\n');
+
+  const ParadiseBridgeDepResult = await deploy(
+    'ParadiseBridge',
+    'ParadiseBridge',
+    [true]
+  );
+  const TestPDTDepResult = await deploy('BridgeERC20', 'BridgeERC20', [
+    'BridgePDT',
+    'BPDT',
+    18,
+    BigNumber.from(1000_0000).mul(BigNumber.from(10).pow(18)),
+    ParadiseBridgeDepResult.address,
+  ]);
+
+  return {
+    TestPDTDepResult,
+    ParadiseBridgeDepResult,
+  };
+}
+
+
+async function deployAndSetupContractsBSCSide() {
+  console.log('<deployAndSetupContractsBSCSide>');
+  const { deployer, deploy } = await setup();
+  const deployments = await deployContractsBSCSide(deploy);
+  const deployedContracts = await getDeployedContracts(deployer);
+  const { ParadiseBridge } = deployedContracts;
+  console.log('addBridgeableTokens...');
+  await waitContractCall(
+    await ParadiseBridge.addBridgeableTokens(
+      [deployments.TestPDTDepResult.address],
+      [
+        {
+          enabled: true,
+          burn: false,
+          minBridgeAmount: 0,
+          maxBridgeAmount: BigNumber.from(
+            '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+          ),
+          bridgeFee: 0,
+        },
+      ]
+    )
+  );
   console.log('>>> CONTRACTS SETUP DONE <<<');
 }

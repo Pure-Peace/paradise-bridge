@@ -83,6 +83,10 @@ const config = {
     paradise: {
       url: node_url('paradise'),
       accounts: accounts('paradise'),
+    },
+    bsctestnet: {
+      url: node_url('bsctestnet'),
+      accounts: accounts('bsctestnet'),
     }
   },
   etherscan: {
