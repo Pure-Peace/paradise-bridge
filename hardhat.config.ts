@@ -84,13 +84,21 @@ const config = {
       url: node_url('paradise'),
       accounts: accounts('paradise'),
     },
-    bsctestnet: {
-      url: node_url('bsctestnet'),
-      accounts: accounts('bsctestnet'),
+    bscTestnet: {
+      url: node_url('bscTestnet'),
+      accounts: accounts('bscTestnet'),
     }
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEYS
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEYS,
+      ropsten: process.env.ETHERSCAN_API_KEYS,
+      rinkeby: process.env.ETHERSCAN_API_KEYS,
+      goerli: process.env.ETHERSCAN_API_KEYS,
+      kovan: process.env.ETHERSCAN_API_KEYS,
+      bscTestnet: process.env.ETHERSCAN_API_KEYS_BSC
+    },
+
   },
   paths: {
     sources: 'src',

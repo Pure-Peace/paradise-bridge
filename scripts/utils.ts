@@ -301,7 +301,7 @@ export async function deployContractsEthereumSide(deploy: DeployFunction) {
 const NETWORK_DEPLOYS = {
   rinkeby: deployAndSetupContractsEthereumSide,
   paradise: deployAndSetupContractsParadiseSide,
-  bsctest: deployAndSetupContractsBSCSide
+  bscTestnet: deployAndSetupContractsBSCSide
 };
 
 export async function deployAndSetupContracts() {
@@ -426,7 +426,7 @@ async function deployAndSetupContractsBSCSide() {
       [
         {
           enabled: true,
-          burn: false,
+          burn: true,
           minBridgeAmount: 0,
           maxBridgeAmount: BigNumber.from(
             '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
