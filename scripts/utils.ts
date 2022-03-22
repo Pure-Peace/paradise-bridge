@@ -316,6 +316,15 @@ async function deployAndSetupContractsEthereumSide() {
   const deployments = await deployContractsEthereumSide(deploy);
   const deployedContracts = await getDeployedContracts(deployer);
   const { ParadiseBridge } = deployedContracts;
+
+  console.log('grantRole...');
+  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
+  await waitContractCall(
+    await ParadiseBridge.grantRole(approverRole, deployer.address)
+  );
+
+  const BURN = false
+
   console.log('addBridgeableTokens...');
   await waitContractCall(
     await ParadiseBridge.addBridgeableTokens(
@@ -323,7 +332,7 @@ async function deployAndSetupContractsEthereumSide() {
       [
         {
           enabled: true,
-          burn: false,
+          burn: BURN,
           minBridgeAmount: 0,
           maxBridgeAmount: BigNumber.from(
             '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
@@ -333,6 +342,12 @@ async function deployAndSetupContractsEthereumSide() {
       ]
     )
   );
+
+  console.log('addBridgeApprovalConfig...')
+  await waitContractCall(
+    await ParadiseBridge.addBridgeApprovalConfig([deployments.TestPDTDepResult.address], [{ enabled: true, transfer: !BURN }])
+  )
+
   console.log('>>> CONTRACTS SETUP DONE <<<');
 }
 
@@ -419,6 +434,15 @@ async function deployAndSetupContractsBSCSide() {
   const deployments = await deployContractsBSCSide(deploy);
   const deployedContracts = await getDeployedContracts(deployer);
   const { ParadiseBridge } = deployedContracts;
+
+  console.log('grantRole...');
+  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
+  await waitContractCall(
+    await ParadiseBridge.grantRole(approverRole, deployer.address)
+  );
+
+  const BURN = true
+
   console.log('addBridgeableTokens...');
   await waitContractCall(
     await ParadiseBridge.addBridgeableTokens(
@@ -426,7 +450,7 @@ async function deployAndSetupContractsBSCSide() {
       [
         {
           enabled: true,
-          burn: true,
+          burn: BURN,
           minBridgeAmount: 0,
           maxBridgeAmount: BigNumber.from(
             '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
@@ -436,5 +460,11 @@ async function deployAndSetupContractsBSCSide() {
       ]
     )
   );
+
+  console.log('addBridgeApprovalConfig...')
+  await waitContractCall(
+    await ParadiseBridge.addBridgeApprovalConfig([deployments.TestPDTDepResult.address], [{ enabled: true, transfer: !BURN }])
+  )
+
   console.log('>>> CONTRACTS SETUP DONE <<<');
 }
