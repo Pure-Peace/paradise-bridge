@@ -141,7 +141,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         checkBridgeTokensConfig(amount, _bridgeableTokens[token])
     {
         if (_bridgeableTokens[token].burn) {
-            TokensHelper.safeBurn(token, msg.sender, amount);
+            TokensHelper.safeBurnFrom(token, msg.sender, amount);
         } else {
             TokensHelper.safeTransferFrom(token, msg.sender, address(this), amount);
         }

@@ -62,11 +62,20 @@ library TokensHelper {
 
     function safeBurn(
         address token,
+        uint256 amount
+    ) internal {
+        // bytes4(keccak256(bytes("burn(uint256)")));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x42966c68, amount));
+        if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert TokenMintingFailed();
+    }
+
+    function safeBurnFrom(
+        address token,
         address from,
         uint256 amount
     ) internal {
-        // bytes4(keccak256(bytes("burn(address,uint256)")));
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x9dc29fac, from, amount));
+        // bytes4(keccak256(bytes("burnFrom(address,uint256)")));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x79cc6790, from, amount));
         if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert TokenMintingFailed();
     }
 }
