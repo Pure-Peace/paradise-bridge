@@ -28,6 +28,11 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         bool transfer;
     }
 
+    struct TokensOnChain {
+        address token;
+        uint256 chainId;
+    }
+
     /**
      * @dev Submit a bridge request on chain
      */
@@ -36,6 +41,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         address indexed sender,
         address indexed recipient,
         uint256 amount,
+        uint256 fees,
         uint256 sourceChain,
         uint256 targetChain
     );
@@ -53,16 +59,16 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     );
 
     event TokensDeposit(uint256 indexed chainId, address indexed from, uint256 amount);
+    event FeeRecipientChanged(address indexed newRecipient, address indexed oldRecipient);
+    event BridgeRunningStatusChanged(bool indexed newRunningStatus, bool indexed oldRunningStatus);
 
     bytes32 public constant BRIDGE_APPROVER_ROLE = keccak256("BRIDGE_APPROVER_ROLE");
 
-    mapping(address => BridgeableTokensConfig) private _bridgeableTokens;
-    BridgeableTokensConfig private _nativeTokensBridgeConfig;
-
+    mapping(bytes32 => BridgeableTokensConfig) private _bridgeableTokens;
     mapping(address => BridgeApprovalConfig) public bridgeApprovalConfig;
-    bool public bridgeToNativeApprovalStatus;
 
     bool public bridgeIsRunning;
+    address public feeRecipient;
 
     modifier checkTokenAddress(address token) {
         if (!Address.isContract(token)) revert InvalidTokenAddress();
@@ -85,10 +91,19 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         _;
     }
 
-    constructor(bool bridgeRunningStatus) {
-        bridgeIsRunning = bridgeRunningStatus;
+    constructor(bool _bridgeRunningStatus, address _feeRecipient) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(BRIDGE_APPROVER_ROLE, DEFAULT_ADMIN_ROLE);
+
+        _setBridgeRunningStatus(_bridgeRunningStatus);
+        _setFeeRecipient(_feeRecipient);
+    }
+
+    /**
+     * @dev Encode token address with chainId
+     */
+    function _encodeTokenWithChainId(address _token, uint256 _chainId) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_token, _chainId));
     }
 
     /**
@@ -102,23 +117,28 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     }
 
     /**
-     * @notice Get the native tokens bridge config
+     * @notice Get the tokens bridge config
+     * @param token The token address (zero is native token)
+     * @param targetChainId The id of target chain
      */
-    function bridgeableTokens() public view returns (BridgeableTokensConfig memory config) {
-        return _nativeTokensBridgeConfig;
-    }
-
-    /**
-     * @notice Get the ERC20 tokens bridge config
-     * @param token The ERC20 token address
-     */
-    function bridgeableTokens(address token)
+    function bridgeableTokens(address token, uint256 targetChainId)
         public
         view
-        checkTokenAddress(token)
         returns (BridgeableTokensConfig memory config)
     {
-        return _bridgeableTokens[token];
+        return _bridgeableTokens[_encodeTokenWithChainId(token, targetChainId)];
+    }
+
+    function _setBridgeRunningStatus(bool newRunningStatus) internal {
+        bool oldRunningStatus = bridgeIsRunning;
+        bridgeIsRunning = newRunningStatus;
+        emit BridgeRunningStatusChanged(newRunningStatus, oldRunningStatus);
+    }
+
+    function _setFeeRecipient(address newRecipient) internal {
+        address oldRecipient = feeRecipient;
+        feeRecipient = newRecipient;
+        emit FeeRecipientChanged(newRecipient, oldRecipient);
     }
 
     /**
@@ -138,14 +158,22 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         nonReentrant
         needBridgeIsRunning
         checkTokenAddress(token)
-        checkBridgeTokensConfig(amount, _bridgeableTokens[token])
+        checkBridgeTokensConfig(amount, bridgeableTokens(token, targetChainId))
     {
-        if (_bridgeableTokens[token].burn) {
+        BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[_encodeTokenWithChainId(token, targetChainId)];
+
+        if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
+            TokensHelper.safeTransferFrom(token, msg.sender, feeRecipient, _tokenConfig.bridgeFee);
+            amount -= _tokenConfig.bridgeFee;
+        }
+
+        if (_tokenConfig.burn) {
             TokensHelper.safeBurnFrom(token, msg.sender, amount);
         } else {
             TokensHelper.safeTransferFrom(token, msg.sender, address(this), amount);
         }
-        emit BridgeToSubmitted(token, msg.sender, recipient, amount, chainId(), targetChainId);
+
+        emit BridgeToSubmitted(token, msg.sender, recipient, amount, _tokenConfig.bridgeFee, chainId(), targetChainId);
     }
 
     /**
@@ -158,9 +186,27 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         payable
         nonReentrant
         needBridgeIsRunning
-        checkBridgeTokensConfig(msg.value, _nativeTokensBridgeConfig)
+        checkBridgeTokensConfig(msg.value, bridgeableTokens(address(0), targetChainId))
     {
-        emit BridgeToSubmitted(address(0), msg.sender, recipient, msg.value, chainId(), targetChainId);
+        uint256 amount = msg.value;
+        BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[
+            _encodeTokenWithChainId(address(0), targetChainId)
+        ];
+
+        if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
+            TokensHelper.safeTransferNativeTokens(feeRecipient, _tokenConfig.bridgeFee);
+            amount -= _tokenConfig.bridgeFee;
+        }
+
+        emit BridgeToSubmitted(
+            address(0),
+            msg.sender,
+            recipient,
+            amount,
+            _tokenConfig.bridgeFee,
+            chainId(),
+            targetChainId
+        );
     }
 
     /**
@@ -180,8 +226,8 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     )
         external
         nonReentrant
-        needBridgeIsRunning
         onlyRole(BRIDGE_APPROVER_ROLE)
+        needBridgeIsRunning
         checkTokenAddress(targetToken)
         checkBridgeApprovalStatus(targetToken)
     {
@@ -205,27 +251,46 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         uint256 sourceChainId,
         address recipient,
         uint256 amount
-    ) external nonReentrant needBridgeIsRunning onlyRole(BRIDGE_APPROVER_ROLE) {
-        if (!bridgeToNativeApprovalStatus) revert UnableToApproveBridge();
+    ) external nonReentrant onlyRole(BRIDGE_APPROVER_ROLE) needBridgeIsRunning checkBridgeApprovalStatus(address(0)) {
         TokensHelper.safeTransferNativeTokens(recipient, amount);
         emit BridgeToApproved(txHash, address(0), recipient, amount, sourceChainId, chainId());
     }
 
-    function addBridgeableTokens(address[] memory addresses, BridgeableTokensConfig[] memory configs)
+    /**
+     * @dev Configure bridgeable tokens
+     */
+    function addBridgeableTokens(TokensOnChain[] memory tokensOnChain, BridgeableTokensConfig[] memory configs)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        if (addresses.length != configs.length) revert InvalidConfigList();
-        for (uint256 i; i < addresses.length; i++) {
-            if (!Address.isContract(addresses[i])) revert InvalidTokenAddress();
-            _bridgeableTokens[addresses[i]] = configs[i];
+        if (tokensOnChain.length != configs.length) revert InvalidConfigList();
+        for (uint256 i; i < tokensOnChain.length; i++) {
+            if (tokensOnChain[i].token != address(0) && !Address.isContract(tokensOnChain[i].token))
+                revert InvalidTokenAddress();
+            if (configs[i].maxBridgeAmount == 0) configs[i].maxBridgeAmount = type(uint256).max;
+            _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)] = configs[i];
         }
     }
 
-    function setNativeTokensBridgeConfig(BridgeableTokensConfig memory config) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _nativeTokensBridgeConfig = config;
+    /**
+     * @dev Configure bridgeable tokens fees
+     */
+    function setBridgeFees(TokensOnChain[] memory tokensOnChain, uint256[] memory fees)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (tokensOnChain.length != fees.length) revert InvalidConfigList();
+        for (uint256 i; i < tokensOnChain.length; i++) {
+            if (tokensOnChain[i].token != address(0) && !Address.isContract(tokensOnChain[i].token))
+                revert InvalidTokenAddress();
+            _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)]
+                .bridgeFee = fees[i];
+        }
     }
 
+    /**
+     * @dev Configure approval of bridgeable tokens
+     */
     function addBridgeApprovalConfig(address[] memory addresses, BridgeApprovalConfig[] memory configs)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -237,15 +302,26 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         }
     }
 
-    function setBridgeToNativeApprovalStatus(bool nativeApprovalStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bridgeToNativeApprovalStatus = nativeApprovalStatus;
-    }
-
+    /**
+     * @dev Set bridge global status
+     * @param bridgeRunningStatus The new bridge running status
+     */
     function setBridgeRunningStatus(bool bridgeRunningStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bridgeIsRunning = bridgeRunningStatus;
+        _setBridgeRunningStatus(bridgeRunningStatus);
     }
 
+    /**
+     * @dev Deposit native tokens to bridge
+     */
     function depositNativeTokens() external payable {
         emit TokensDeposit(chainId(), msg.sender, msg.value);
+    }
+
+    /**
+     * @dev Set a new fee recipient
+     * @param newRecipient The new recipient address
+     */
+    function setFeeRecipient(address newRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setFeeRecipient(newRecipient);
     }
 }

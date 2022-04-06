@@ -1,4 +1,4 @@
-import { deployAndSetupContracts } from "./utils";
+import {deployAndSetupContracts} from './utils';
 
 deployAndSetupContracts()
   .then(() => process.exit(0))

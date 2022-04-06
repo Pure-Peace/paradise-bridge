@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-var-requires */
 import hre from 'hardhat';
-import { BigNumber, Contract, ContractTransaction, Signer } from 'ethers';
-import { DeployResult } from 'hardhat-deploy/types';
+import {BigNumber, Contract, ContractTransaction, Signer} from 'ethers';
+import {DeployResult} from 'hardhat-deploy/types';
 import fs from 'fs';
 import path from 'path';
 
-import { GAS_LIMIT } from './constants';
-import { getContractForEnvironment } from '../test/utils/getContractForEnvironment';
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { ParadiseBridge } from '../typechain/ParadiseBridge';
+import {GAS_LIMIT} from './constants';
+import {getContractForEnvironment} from '../test/utils/getContractForEnvironment';
+import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
+import {ParadiseBridge} from '../typechain/ParadiseBridge';
 
 import {
   ContractList,
@@ -20,12 +20,14 @@ import {
   ZERO_ADDRESS,
 } from './constants';
 
-import NETWORK_DEPLOY_CONFIG, { DeployConfig } from '../deploy.config';
+import NETWORK_DEPLOY_CONFIG, {DeployConfig} from '../deploy.config';
 
 require('dotenv').config();
 const prompts = require('prompts');
 
-const { deploy: _dep } = hre.deployments;
+const {deploy: _dep} = hre.deployments;
+
+const BASE_PATH = `./deployments/${hre.network.name}`;
 
 let __DEPLOY_CONFIG: DeployConfig;
 export function deployConfig() {
@@ -43,7 +45,7 @@ export type DeployFunction = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args?: string[] | any[]
 ) => Promise<DeployResult>;
-export type Deployments = { [key: string]: DeployResult };
+export type Deployments = {[key: string]: DeployResult};
 
 export async function setup(): Promise<{
   accounts: SignerWithAddress[];
@@ -51,7 +53,7 @@ export async function setup(): Promise<{
   deploy: (
     deployName: string,
     contractName: string,
-    args?: string[]
+    args?: any[]
   ) => Promise<DeployResult>;
 }> {
   const accounts = await hre.ethers.getSigners();
@@ -70,7 +72,7 @@ export async function setup(): Promise<{
     deploy: async (
       deployName: string,
       contractName: string,
-      args: string[] = []
+      args: any[] = []
     ): Promise<DeployResult> => {
       console.log(
         `\n>> Deploying contract "${deployName}" ("${contractName}")...`
@@ -84,9 +86,12 @@ export async function setup(): Promise<{
         from: deployer.address,
       });
       console.log(
-        `${deployResult.newlyDeployed ? '[New]' : '[Reused]'
-        } contract "${deployName}" ("${contractName}") deployed at "${deployResult.address
-        }" \n - tx: "${deployResult.transactionHash}" \n - gas: ${deployResult.receipt?.gasUsed
+        `${
+          deployResult.newlyDeployed ? '[New]' : '[Reused]'
+        } contract "${deployName}" ("${contractName}") deployed at "${
+          deployResult.address
+        }" \n - tx: "${deployResult.transactionHash}" \n - gas: ${
+          deployResult.receipt?.gasUsed
         } \n - deployer: "${deployer.address}"`
       );
       return deployResult;
@@ -112,8 +117,8 @@ export function waitContractCall(
 export async function tryGetContractForEnvironment<T extends Contract>(
   contractName: string,
   deployer: Signer
-): Promise<{ err: any; contract: T | undefined }> {
-  const result: { err: any; contract: T | undefined } = {
+): Promise<{err: any; contract: T | undefined}> {
+  const result: {err: any; contract: T | undefined} = {
     err: undefined,
     contract: undefined,
   };
@@ -128,15 +133,14 @@ export async function tryGetContractForEnvironment<T extends Contract>(
     result.err = err;
   }
   try {
-    const basePath = `./deployments/${hre.network.name}`;
     const deployment = JSON.parse(
-      fs.readFileSync(path.join(basePath, `${contractName}.json`)).toString()
+      fs.readFileSync(path.join(BASE_PATH, `${contractName}.json`)).toString()
     );
-    result.contract = (await hre.ethers.getContractAt(
+    result.contract = ((await hre.ethers.getContractAt(
       deployment.abi,
       deployment.address,
       deployer
-    )) as unknown as T;
+    )) as unknown) as T;
     return result;
   } catch (err2) {
     result.err = err2;
@@ -171,16 +175,16 @@ export async function getContractFromEnvOrPrompts<T extends Contract>(
   {
     contractNameEnv,
     contractName,
-  }: { contractNameEnv: string; contractName?: string },
+  }: {contractNameEnv: string; contractName?: string},
   deployer: Signer
 ): Promise<T> {
   console.log(`\nGetting contract "${contractNameEnv}"...`);
-  const { contract, err } = await tryGetContractForEnvironment<T>(
+  const {contract, err} = await tryGetContractForEnvironment<T>(
     contractNameEnv,
     deployer
   );
   if (!contract) {
-    const { contractAddress } = await prompts({
+    const {contractAddress} = await prompts({
       type: 'text',
       name: 'contractAddress',
       message:
@@ -276,195 +280,150 @@ export async function getDeployedContracts(deployer: SignerWithAddress) {
     deployer
   );
 
-  return { ParadiseBridge };
+  return {ParadiseBridge};
 }
-
-export async function deployContractsEthereumSide(deploy: DeployFunction) {
-  console.log('\n>>>>>>>>> Deploying contracts EthereumSide...\n');
-
-  const TestPDTDepResult = await deploy('TestPDT', 'TestPDT');
-  const ParadiseBridgeDepResult = await deploy(
-    'ParadiseBridge',
-    'ParadiseBridge',
-    [true]
-  );
-
-
-  return {
-    TestPDTDepResult,
-    ParadiseBridgeDepResult,
-  };
-}
-
-
-
-const NETWORK_DEPLOYS = {
-  rinkeby: deployAndSetupContractsEthereumSide,
-  paradise: deployAndSetupContractsParadiseSide,
-  bscTestnet: deployAndSetupContractsBSCSide
-};
 
 export async function deployAndSetupContracts() {
-  const deployFunction = (NETWORK_DEPLOYS as any)[hre.network.name];
-  if (!deployFunction) throw new Error(`Invalid network ${hre.network.name}`);
-  await deployFunction();
-}
-
-async function deployAndSetupContractsEthereumSide() {
-  console.log('<deployAndSetupContractsEthereumSide>');
-  const { deployer, deploy } = await setup();
-  const deployments = await deployContractsEthereumSide(deploy);
-  const deployedContracts = await getDeployedContracts(deployer);
-  const { ParadiseBridge } = deployedContracts;
-
-  console.log('grantRole...');
-  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
-  await waitContractCall(
-    await ParadiseBridge.grantRole(approverRole, deployer.address)
-  );
-
-  const BURN = false
-
-  console.log('addBridgeableTokens...');
-  await waitContractCall(
-    await ParadiseBridge.addBridgeableTokens(
-      [deployments.TestPDTDepResult.address],
-      [
-        {
-          enabled: true,
-          burn: BURN,
-          minBridgeAmount: 0,
-          maxBridgeAmount: BigNumber.from(
-            '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-          ),
-          bridgeFee: 0,
-        },
-      ]
-    )
-  );
-
-  console.log('addBridgeApprovalConfig...')
-  await waitContractCall(
-    await ParadiseBridge.addBridgeApprovalConfig([deployments.TestPDTDepResult.address], [{ enabled: true, transfer: !BURN }])
-  )
-
-  console.log('>>> CONTRACTS SETUP DONE <<<');
-}
-
-export async function deployContractsParadiseSide(deploy: DeployFunction) {
-  console.log('\n>>>>>>>>> Deploying contracts ParadiseSide...\n');
-
-  const ParadiseBridgeDepResult = await deploy(
-    'ParadiseBridge',
-    'ParadiseBridge',
-    [true]
-  );
-
-  return {
-    ParadiseBridgeDepResult,
-  };
-}
-
-async function deployAndSetupContractsParadiseSide() {
-  console.log('<deployAndSetupContractsParadiseSide>');
-  const { deployer, deploy } = await setup();
-  const deployments = await deployContractsParadiseSide(deploy);
-  const deployedContracts = await getDeployedContracts(deployer);
-  const { ParadiseBridge } = deployedContracts;
-  console.log('setBridgeToNativeApprovalStatus...');
-  await waitContractCall(
-    await ParadiseBridge.setBridgeToNativeApprovalStatus(true)
-  );
-
-  console.log('grantRole...');
-  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
-  await waitContractCall(
-    await ParadiseBridge.grantRole(approverRole, deployer.address)
-  );
-
-  console.log('setNativeTokensBridgeConfig...');
-  await waitContractCall(
-    await ParadiseBridge.setNativeTokensBridgeConfig({
-      enabled: true,
-      burn: false,
-      minBridgeAmount: 0,
-      maxBridgeAmount: BigNumber.from(
-        '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-      ),
-      bridgeFee: 0,
-    })
-  );
-
-  console.log('deposit paradise...');
-  await waitContractCall(
-    await ParadiseBridge.depositNativeTokens({
-      value: BigNumber.from(100_0000).mul(BigNumber.from(10).pow(18)),
-    })
-  );
-  console.log('>>> CONTRACTS SETUP DONE <<<');
-}
-
-
-export async function deployContractsBSCSide(deploy: DeployFunction) {
-  console.log('\n>>>>>>>>> Deploying contracts BSC side...\n');
-
-  const ParadiseBridgeDepResult = await deploy(
-    'ParadiseBridge',
-    'ParadiseBridge',
-    [true]
-  );
-  const TestPDTDepResult = await deploy('BridgeERC20', 'BridgeERC20', [
-    'BridgePDT',
-    'BPDT',
-    18,
-    BigNumber.from(1000_0000).mul(BigNumber.from(10).pow(18)),
-    ParadiseBridgeDepResult.address,
+  const {deployer, deploy} = await setup();
+  const {bridgeRunningStatus, feeRecipient} = deployConfig();
+  await deploy('ParadiseBridge', 'ParadiseBridge', [
+    bridgeRunningStatus,
+    feeRecipient,
   ]);
-
-  return {
-    TestPDTDepResult,
-    ParadiseBridgeDepResult,
-  };
+  const {ParadiseBridge} = await getDeployedContracts(deployer);
+  await grantBridgeApprovers(deployer, ParadiseBridge);
+  await deployBridgeERC20TokensForBridge(deploy, ParadiseBridge);
+  const bridgeERC20TokensDict = getBridgeERC20TokensLocal();
+  await addBridgeableTokens(bridgeERC20TokensDict, ParadiseBridge);
+  await addBridgeApprovalConfig(bridgeERC20TokensDict, ParadiseBridge);
+  await depositNativeTokensToBridge(ParadiseBridge);
 }
 
+async function grantBridgeApprovers(
+  deployer: SignerWithAddress,
+  paradiseBridge: ParadiseBridge
+) {
+  const {bridgeApprovers} = deployConfig();
+  if (bridgeApprovers.length === 0) return;
 
-async function deployAndSetupContractsBSCSide() {
-  console.log('<deployAndSetupContractsBSCSide>');
-  const { deployer, deploy } = await setup();
-  const deployments = await deployContractsBSCSide(deploy);
-  const deployedContracts = await getDeployedContracts(deployer);
-  const { ParadiseBridge } = deployedContracts;
+  console.log('granting bridge approver roles...');
+  const approverRole = await paradiseBridge.BRIDGE_APPROVER_ROLE();
+  for (let approver of bridgeApprovers) {
+    if (approver === 'deployer') {
+      approver = deployer.address;
+    }
+    if (await paradiseBridge.hasRole(approverRole, approver)) continue;
+    console.log(`add approver ${approver}...`);
+    await waitContractCall(
+      await paradiseBridge.grantRole(approverRole, approver)
+    );
+  }
+}
 
-  console.log('grantRole...');
-  const approverRole = await ParadiseBridge.BRIDGE_APPROVER_ROLE();
-  await waitContractCall(
-    await ParadiseBridge.grantRole(approverRole, deployer.address)
-  );
-
-  const BURN = true
+async function addBridgeableTokens(
+  bridgeERC20TokensDict: {[key: string]: string},
+  paradiseBridge: ParadiseBridge
+) {
+  const {bridgeableTokens} = deployConfig();
+  if (bridgeableTokens.length === 0) return;
 
   console.log('addBridgeableTokens...');
+  const tokenList = [];
+  const configList = [];
+  for (const cfg of bridgeableTokens) {
+    tokenList.push({
+      token: bridgeERC20TokensDict[cfg.token] || cfg.token,
+      chainId: cfg.targetChainId,
+    });
+    configList.push(cfg.config);
+  }
+
   await waitContractCall(
-    await ParadiseBridge.addBridgeableTokens(
-      [deployments.TestPDTDepResult.address],
-      [
-        {
-          enabled: true,
-          burn: BURN,
-          minBridgeAmount: 0,
-          maxBridgeAmount: BigNumber.from(
-            '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-          ),
-          bridgeFee: 0,
-        },
-      ]
-    )
+    await paradiseBridge.addBridgeableTokens(tokenList, configList)
   );
+}
 
-  console.log('addBridgeApprovalConfig...')
+async function addBridgeApprovalConfig(
+  bridgeERC20TokensDict: {[key: string]: string},
+  paradiseBridge: ParadiseBridge
+) {
+  const {bridgeApprovalConfigs} = deployConfig();
+  if (bridgeApprovalConfigs.length === 0) return;
+
+  console.log('addBridgeApprovalConfig...');
+  const tokenList = [];
+  const configList = [];
+  for (const cfg of bridgeApprovalConfigs) {
+    tokenList.push(bridgeERC20TokensDict[cfg.token] || cfg.token);
+    configList.push(cfg.config);
+  }
+
   await waitContractCall(
-    await ParadiseBridge.addBridgeApprovalConfig([deployments.TestPDTDepResult.address], [{ enabled: true, transfer: !BURN }])
-  )
+    await paradiseBridge.addBridgeApprovalConfig(tokenList, configList)
+  );
+}
 
-  console.log('>>> CONTRACTS SETUP DONE <<<');
+async function depositNativeTokensToBridge(paradiseBridge: ParadiseBridge) {
+  const {depositNativeTokensAmountEther} = deployConfig();
+  if (!depositNativeTokensAmountEther || depositNativeTokensAmountEther === 0)
+    return;
+
+  console.log('deposit native tokens...');
+  await waitContractCall(
+    await paradiseBridge.depositNativeTokens({
+      value: BigNumber.from(depositNativeTokensAmountEther).mul(
+        BigNumber.from(10).pow(18)
+      ),
+    })
+  );
+}
+
+function getBridgeERC20TokensLocal(): {[key: string]: string} {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(BASE_PATH, 'bridgeERC20Tokens.json')).toString()
+    );
+  } catch (_err) {
+    return {};
+  }
+}
+
+function saveBridgeERC20TokensLocal(bridgeERC20Deployments: {
+  [key: string]: DeployResult;
+}) {
+  try {
+    const ERC20Deployments = getBridgeERC20TokensLocal();
+    for (const [k, v] of Object.entries(bridgeERC20Deployments)) {
+      ERC20Deployments[k] = v.address;
+    }
+    fs.writeFileSync(
+      path.join(BASE_PATH, 'bridgeERC20Tokens.json'),
+      JSON.stringify(ERC20Deployments)
+    );
+  } catch (_err) {}
+}
+
+async function deployBridgeERC20TokensForBridge(
+  deploy: DeployFunction,
+  paradiseBridge: ParadiseBridge
+) {
+  const {bridgeERC20DeployConfigs} = deployConfig();
+  if (bridgeERC20DeployConfigs.length === 0) return;
+
+  const bridgeERC20Deployments: {[key: string]: DeployResult} = {};
+  for (const cfg of bridgeERC20DeployConfigs) {
+    bridgeERC20Deployments[cfg.name] = await deploy(cfg.name, 'BridgeERC20', [
+      cfg.name,
+      cfg.symbol,
+      cfg.decimals,
+      BigNumber.from(cfg.totalSupplyWithDecimals).mul(
+        BigNumber.from(10).pow(cfg.decimals)
+      ),
+      paradiseBridge.address,
+    ]);
+  }
+
+  saveBridgeERC20TokensLocal(bridgeERC20Deployments);
+
+  return bridgeERC20Deployments;
 }
