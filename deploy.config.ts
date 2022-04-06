@@ -43,6 +43,10 @@ const PARADISE_TOKEN_MAINNET = '0x1E203f360B594CB537879cb234F41EBf4D8bc76e';
 const PARADISE_BRIDGE_FEE_RECIPIENT =
   '0x686E797117ba23b30aA07AAdF82ba8A0B329948b';
 
+const PARADISE_CHAIN_ID = 8648888;
+const BSC_TESTNET_CHAIN_ID = 97;
+const RINKEBY_CHAIN_ID = 4;
+
 const config: {[key: string]: DeployConfig} = {
   rinkeby: {
     bridgeRunningStatus: true,
@@ -51,7 +55,7 @@ const config: {[key: string]: DeployConfig} = {
     bridgeableTokens: [
       {
         token: PARADISE_TOKEN_MAINNET,
-        targetChainId: 864888,
+        targetChainId: PARADISE_CHAIN_ID,
         config: {
           enabled: true,
           burn: false,
@@ -62,7 +66,7 @@ const config: {[key: string]: DeployConfig} = {
       },
       {
         token: PARADISE_TOKEN_MAINNET,
-        targetChainId: 97,
+        targetChainId: BSC_TESTNET_CHAIN_ID,
         config: {
           enabled: true,
           burn: false,
@@ -91,7 +95,7 @@ const config: {[key: string]: DeployConfig} = {
     bridgeableTokens: [
       {
         token: NATIVE_TOKEN,
-        targetChainId: 97,
+        targetChainId: BSC_TESTNET_CHAIN_ID,
         config: {
           enabled: true,
           burn: false,
@@ -102,7 +106,7 @@ const config: {[key: string]: DeployConfig} = {
       },
       {
         token: NATIVE_TOKEN,
-        targetChainId: 4,
+        targetChainId: RINKEBY_CHAIN_ID,
         config: {
           enabled: true,
           burn: false,
@@ -131,7 +135,7 @@ const config: {[key: string]: DeployConfig} = {
     bridgeableTokens: [
       {
         token: 'BridgePDT',
-        targetChainId: 864888,
+        targetChainId: PARADISE_CHAIN_ID,
         config: {
           enabled: true,
           burn: true,
@@ -142,7 +146,7 @@ const config: {[key: string]: DeployConfig} = {
       },
       {
         token: 'BridgePDT',
-        targetChainId: 4,
+        targetChainId: RINKEBY_CHAIN_ID,
         config: {
           enabled: true,
           burn: true,
