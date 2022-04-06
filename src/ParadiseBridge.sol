@@ -8,13 +8,6 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
 contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
-    error BridgeIsNotAvaliable();
-    error InvalidTokenAddress();
-    error InvalidBridgeAmount();
-    error UnbridgeableTokens();
-    error UnableToApproveBridge();
-    error InvalidConfigList();
-
     struct BridgeableTokensConfig {
         bool enabled;
         bool burn;
@@ -71,23 +64,22 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     address public feeRecipient;
 
     modifier checkTokenAddress(address token) {
-        if (!Address.isContract(token)) revert InvalidTokenAddress();
+        require(Address.isContract(token), "invalid token address");
         _;
     }
 
     modifier needBridgeIsRunning() {
-        if (!bridgeIsRunning) revert BridgeIsNotAvaliable();
+        require(bridgeIsRunning, "bridge is not running");
         _;
     }
 
     modifier checkBridgeApprovalStatus(address token) {
-        if (!bridgeApprovalConfig[token].enabled) revert UnableToApproveBridge();
+        require(bridgeApprovalConfig[token].enabled, "token is not approved");
         _;
     }
 
-    modifier checkBridgeTokensConfig(uint256 amount, BridgeableTokensConfig memory config) {
-        if (!config.enabled) revert UnbridgeableTokens();
-        if (amount < config.minBridgeAmount || amount > config.maxBridgeAmount) revert InvalidBridgeAmount();
+    modifier checkArrayLength(uint256 lenA, uint256 lenB) {
+        require(lenA == lenB, "arrays should equal in length");
         _;
     }
 
@@ -135,6 +127,14 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         emit BridgeRunningStatusChanged(newRunningStatus, oldRunningStatus);
     }
 
+    /**
+     * @dev Check token address
+     * zero address is native token
+     */
+    function _checkTokenAddress(address token) internal view {
+        require(token == address(0) || Address.isContract(token), "invalid token address");
+    }
+
     function _setFeeRecipient(address newRecipient) internal {
         address oldRecipient = feeRecipient;
         feeRecipient = newRecipient;
@@ -153,19 +153,23 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         address recipient,
         uint256 amount,
         uint256 targetChainId
-    )
-        external
-        nonReentrant
-        needBridgeIsRunning
-        checkTokenAddress(token)
-        checkBridgeTokensConfig(amount, bridgeableTokens(token, targetChainId))
-    {
+    ) external nonReentrant needBridgeIsRunning checkTokenAddress(token) {
+        require(recipient != address(0), "invalid recipient");
+
         BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[_encodeTokenWithChainId(token, targetChainId)];
+
+        require(_tokenConfig.enabled, "token is not bridgeable");
+        require(amount > _tokenConfig.bridgeFee, "bridge amount should be greater than fees");
 
         if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
             TokensHelper.safeTransferFrom(token, msg.sender, feeRecipient, _tokenConfig.bridgeFee);
             amount -= _tokenConfig.bridgeFee;
         }
+
+        require(
+            (amount >= _tokenConfig.minBridgeAmount) && (amount <= _tokenConfig.maxBridgeAmount),
+            "invalid bridge amount range"
+        );
 
         if (_tokenConfig.burn) {
             TokensHelper.safeBurnFrom(token, msg.sender, amount);
@@ -186,17 +190,26 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         payable
         nonReentrant
         needBridgeIsRunning
-        checkBridgeTokensConfig(msg.value, bridgeableTokens(address(0), targetChainId))
     {
+        require(recipient != address(0), "invalid recipient");
+
         uint256 amount = msg.value;
         BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[
             _encodeTokenWithChainId(address(0), targetChainId)
         ];
 
+        require(_tokenConfig.enabled, "token is not bridgeable");
+        require(amount > _tokenConfig.bridgeFee, "bridge amount should be greater than fees");
+
         if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
             TokensHelper.safeTransferNativeTokens(feeRecipient, _tokenConfig.bridgeFee);
             amount -= _tokenConfig.bridgeFee;
         }
+
+        require(
+            (amount >= _tokenConfig.minBridgeAmount) && (amount <= _tokenConfig.maxBridgeAmount),
+            "invalid bridge amount range"
+        );
 
         emit BridgeToSubmitted(
             address(0),
@@ -262,12 +275,13 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     function addBridgeableTokens(TokensOnChain[] memory tokensOnChain, BridgeableTokensConfig[] memory configs)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
+        checkArrayLength(tokensOnChain.length, configs.length)
     {
-        if (tokensOnChain.length != configs.length) revert InvalidConfigList();
         for (uint256 i; i < tokensOnChain.length; i++) {
-            if (tokensOnChain[i].token != address(0) && !Address.isContract(tokensOnChain[i].token))
-                revert InvalidTokenAddress();
-            if (configs[i].maxBridgeAmount == 0) configs[i].maxBridgeAmount = type(uint256).max;
+            _checkTokenAddress(tokensOnChain[i].token);
+            if (configs[i].maxBridgeAmount == 0) {
+                configs[i].maxBridgeAmount = type(uint256).max;
+            }
             _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)] = configs[i];
         }
     }
@@ -278,11 +292,10 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     function setBridgeFees(TokensOnChain[] memory tokensOnChain, uint256[] memory fees)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
+        checkArrayLength(tokensOnChain.length, fees.length)
     {
-        if (tokensOnChain.length != fees.length) revert InvalidConfigList();
         for (uint256 i; i < tokensOnChain.length; i++) {
-            if (tokensOnChain[i].token != address(0) && !Address.isContract(tokensOnChain[i].token))
-                revert InvalidTokenAddress();
+            _checkTokenAddress(tokensOnChain[i].token);
             _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)]
                 .bridgeFee = fees[i];
         }
@@ -291,14 +304,14 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     /**
      * @dev Configure approval of bridgeable tokens
      */
-    function addBridgeApprovalConfig(address[] memory addresses, BridgeApprovalConfig[] memory configs)
+    function addBridgeApprovalConfig(address[] memory tokenAddresses, BridgeApprovalConfig[] memory configs)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
+        checkArrayLength(tokenAddresses.length, configs.length)
     {
-        if (addresses.length != configs.length) revert InvalidConfigList();
-        for (uint256 i; i < addresses.length; i++) {
-            if (!Address.isContract(addresses[i])) revert InvalidTokenAddress();
-            bridgeApprovalConfig[addresses[i]] = configs[i];
+        for (uint256 i; i < tokenAddresses.length; i++) {
+            _checkTokenAddress(tokenAddresses[i]);
+            bridgeApprovalConfig[tokenAddresses[i]] = configs[i];
         }
     }
 
