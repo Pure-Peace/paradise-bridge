@@ -126,7 +126,11 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         view
         returns (BridgeableTokensConfig memory config)
     {
-        return _bridgeableTokens[_encodeTokenWithChainId(token, targetChainId)];
+        BridgeableTokensConfig memory _tokenConfig = _bridgeableTokens[_encodeTokenWithChainId(token, targetChainId)];
+        if (!globalFeeStatus) {
+            _tokenConfig.bridgeFee = 0;
+        }
+        return _tokenConfig;
     }
 
     function _setBridgeRunningStatus(bool newRunningStatus) internal {
