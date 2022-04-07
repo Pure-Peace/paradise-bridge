@@ -8,26 +8,51 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
 contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
+    /**
+     * @dev Token bridging configuration
+     */
     struct BridgeableTokensConfig {
+        // Whether to allow this token into the bridge.
         bool enabled;
+        // When the token enters the bridge, choose to `burn` (true) or `transfer to the bridge` (false).
         bool burn;
+        // After deducting fee, the bridge amount needs to be greater than the minimum value.
         uint256 minBridgeAmount;
+        // Maximum amount to bridge.
         uint256 maxBridgeAmount;
+        // Bridge fee, set by administrator.
         uint256 bridgeFee;
     }
 
+    /**
+     * @dev Rules for Approving Token Bridging
+     */
     struct BridgeApprovalConfig {
+        // whether to allow this token to be approved for bridging.
         bool enabled;
+        // When bridging, the target token will be `transferred` (true) or `mint by the contract` (false).
         bool transfer;
     }
 
+    /**
+     * @dev The token contract is on the specified chain
+     */
     struct TokensOnChain {
+        // Token contract address
         address token;
+        // Specified chain ID
         uint256 chainId;
     }
 
     /**
-     * @dev Submit a bridge request on chain
+     * @dev Submit a bridge request on source chain
+     * @param token The token address on the source chain.
+     * @param sender The bridge request sender.
+     * @param recipient The token recipients on the target chain.
+     * @param amount The amount (after deduction of fee) of tokens the receiver should receive.
+     * @param fees The fee charged by the bridge.
+     * @param sourceChain Bridging from chain ID.
+     * @param targetChain Bridging to chain ID.
      */
     event BridgeToSubmitted(
         address indexed token,
@@ -40,7 +65,13 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     );
 
     /**
-     * @dev Emit after bridging is complete
+     * @dev Emit on target chain after bridging is complete
+     * @param txhash The transaction hash of the bridge request submitted on the source chain.
+     * @param targetToken The token address on the target chain.
+     * @param recipient The token recipients on the target chain.
+     * @param amount The amount of tokens the receiver should receive.
+     * @param sourceChain Bridging from chain ID.
+     * @param targetChain Bridging to chain ID.
      */
     event BridgeToApproved(
         bytes32 indexed txhash,
@@ -51,8 +82,21 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         uint256 targetChain
     );
 
+    /**
+     * @dev Emit when the native token is deposited on the bridge
+     * @param chainId The chain id where the bridge contract is located.
+     * @param amount Deposit amount.
+     */
     event TokensDeposit(uint256 indexed chainId, address indexed from, uint256 amount);
+
+    /**
+     * @dev Emit when fee recipient changes
+     */
     event FeeRecipientChanged(address indexed newRecipient, address indexed oldRecipient);
+
+    /**
+     * @dev Emit when bridge running status changes
+     */
     event BridgeRunningStatusChanged(bool indexed newRunningStatus, bool indexed oldRunningStatus);
 
     bytes32 public constant BRIDGE_APPROVER_ROLE = keccak256("BRIDGE_APPROVER_ROLE");
@@ -60,9 +104,19 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     mapping(bytes32 => BridgeableTokensConfig) private _bridgeableTokens;
     mapping(address => BridgeApprovalConfig) public bridgeApprovalConfig;
 
+    /**
+     * @dev The address of the fee recipient
+     */
     address public feeRecipient;
 
+    /**
+     * @notice Is bridge currently available
+     */
     bool public bridgeIsRunning;
+
+    /**
+     * @notice Whether bridge currently charges fee (global setting)
+     */
     bool public globalFeeStatus;
 
     modifier checkTokenAddress(address token) {
@@ -170,10 +224,10 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @notice Bridging the ERC20 token to the target chain
-     * @param token The ERC20 token address on the current chain
-     * @param recipient The recipient address on the target chain
-     * @param amount The bridge ERC20 tokens amount
-     * @param targetChainId The target chain ID (can be found here: https://chainlist.org/)
+     * @param token The ERC20 token address on the current chain.
+     * @param recipient The recipient address on the target chain.
+     * @param amount The bridge ERC20 tokens amount.
+     * @param targetChainId The target chain ID (can be found here: https://chainlist.org/).
      */
     function bridgeTokensTo(
         address token,
@@ -209,8 +263,8 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @notice Bridging the native token to the target chain
-     * @param recipient The recipient address on the target chain
-     * @param targetChainId The target chain ID (can be found here: https://chainlist.org/)
+     * @param recipient The recipient address on the target chain.
+     * @param targetChainId The target chain ID (can be found here: https://chainlist.org/).
      */
     function bridgeNativeTokensTo(address recipient, uint256 targetChainId)
         external
@@ -251,11 +305,11 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @dev Approvers process bridge requests (to ERC20)
-     * @param txHash The transaction hash of the bridge request from source chain
-     * @param sourceChainId The chain id that made the bridge request
-     * @param targetToken The address of the target token
-     * @param recipient The recipient of tokens
-     * @param amount The amount of tokens
+     * @param txHash The transaction hash of the bridge request from source chain.
+     * @param sourceChainId The chain id that made the bridge request.
+     * @param targetToken The address of the target token.
+     * @param recipient The recipient of tokens.
+     * @param amount The amount of tokens.
      */
     function approveBridgeTo(
         bytes32 txHash,
@@ -281,10 +335,10 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @dev Approvers process bridge requests (to native tokens)
-     * @param txHash The transaction hash of the bridge request from source chain
-     * @param sourceChainId The chain id that made the bridge request
-     * @param recipient The recipient of tokens
-     * @param amount The amount of tokens
+     * @param txHash The transaction hash of the bridge request from source chain.
+     * @param sourceChainId The chain id that made the bridge request.
+     * @param recipient The recipient of tokens.
+     * @param amount The amount of tokens.
      */
     function approveBridgeToNative(
         bytes32 txHash,
@@ -344,7 +398,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @dev Set bridge global status
-     * @param bridgeRunningStatus The new bridge running status
+     * @param bridgeRunningStatus The new bridge running status.
      */
     function setBridgeRunningStatus(bool bridgeRunningStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setBridgeRunningStatus(bridgeRunningStatus);
@@ -359,12 +413,16 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @dev Set a new fee recipient
-     * @param newRecipient The new recipient address
+     * @param newRecipient The new recipient address.
      */
     function setFeeRecipient(address newRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setFeeRecipient(newRecipient);
     }
 
+    /**
+     * @dev Set a new global fee status
+     * @param newFeeStatus The new fee status.
+     */
     function setGlobalFeeStatus(bool newFeeStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
         globalFeeStatus = newFeeStatus;
     }
