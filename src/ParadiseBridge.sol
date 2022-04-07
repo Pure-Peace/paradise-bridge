@@ -224,7 +224,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         require(_tokenConfig.enabled, "token is not bridgeable");
         require(amount > _tokenConfig.bridgeFee, "bridge amount should be greater than fees");
 
-        if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
+        if (globalFeeStatus && _tokenConfig.bridgeFee > 0) {
             TokensHelper.safeTransferNativeTokens(feeRecipient, _tokenConfig.bridgeFee);
             amount -= _tokenConfig.bridgeFee;
         }
