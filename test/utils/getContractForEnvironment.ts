@@ -1,45 +1,76 @@
-import { Signer, Contract } from "ethers";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { genGetContractWith } from "./genHelpers";
-type THardHatLookupHelper<T> = (hre: HardhatRuntimeEnvironment, contractSlug: string, signer?: string | Signer | undefined) => Promise<T>;
-function generateEnvNameContractDefHelper(networkToContract: { [networkName: string]: string }, { abiName, lookupName }: { abiName?: string, lookupName?: string } = {}): THardHatLookupHelper<any> {
-
-
-  return async (hre: HardhatRuntimeEnvironment, contractSlug: string, signer?: string | Signer | undefined) => {
-    const { getContract, getContractAt } = genGetContractWith(hre);
-    const addressOrAbi = (Object.prototype.hasOwnProperty.call(networkToContract, hre.network.name) && networkToContract[hre.network.name]) ? networkToContract[hre.network.name] : null;
-    const contractAddressOverride = (addressOrAbi && addressOrAbi.substring(0, 2) === "0x") ? addressOrAbi : null;
-    const contractAbiName = contractAddressOverride ? (abiName || contractSlug) : (contractAddressOverride || abiName || contractSlug);
+import {Signer, Contract} from 'ethers';
+import {HardhatRuntimeEnvironment} from 'hardhat/types';
+import {genGetContractWith} from './genHelpers';
+type THardHatLookupHelper<T> = (
+  hre: HardhatRuntimeEnvironment,
+  contractSlug: string,
+  signer?: string | Signer | undefined
+) => Promise<T>;
+function generateEnvNameContractDefHelper(
+  networkToContract: {[networkName: string]: string},
+  {abiName, lookupName}: {abiName?: string; lookupName?: string} = {}
+): THardHatLookupHelper<any> {
+  return async (
+    hre: HardhatRuntimeEnvironment,
+    contractSlug: string,
+    signer?: string | Signer | undefined
+  ) => {
+    const {getContract, getContractAt} = genGetContractWith(hre);
+    const addressOrAbi =
+      Object.prototype.hasOwnProperty.call(
+        networkToContract,
+        hre.network.name
+      ) && networkToContract[hre.network.name]
+        ? networkToContract[hre.network.name]
+        : null;
+    const contractAddressOverride =
+      addressOrAbi && addressOrAbi.substring(0, 2) === '0x'
+        ? addressOrAbi
+        : null;
+    const contractAbiName = contractAddressOverride
+      ? abiName || contractSlug
+      : contractAddressOverride || abiName || contractSlug;
     if (contractAddressOverride) {
-      return getContractAt((lookupName || contractAbiName), contractAddressOverride, signer);
+      return getContractAt(
+        lookupName || contractAbiName,
+        contractAddressOverride,
+        signer
+      );
     } else {
       if (abiName && lookupName && lookupName !== abiName) {
         const realContract = await getContract(lookupName);
         return getContractAt(contractAbiName, realContract.address, signer);
       } else {
-
         return getContract(contractAbiName, signer);
       }
     }
-  }
-
+  };
 }
 const DEF_GET_CONTRACT_FOR_ENVIRONMENT = {
-  "ParadiseBridge": generateEnvNameContractDefHelper({
-    "hardhat": "ParadiseBridge",
+  BridgeERC20: generateEnvNameContractDefHelper(
+    {},
+    {lookupName: 'BridgeERC20Proxy', abiName: 'BridgeERC20'}
+  ),
+  ParadiseBridge: generateEnvNameContractDefHelper(
+    {},
+    {lookupName: 'ParadiseBridgeProxy', abiName: 'ParadiseBridge'}
+  ),
+  TestPDT: generateEnvNameContractDefHelper({
+    hardhat: 'TestPDT',
   }),
-  "TestPDT": generateEnvNameContractDefHelper({
-    "hardhat": "TestPDT",
-  })
-}
+};
 type TContractSlug = keyof typeof DEF_GET_CONTRACT_FOR_ENVIRONMENT;
 
-async function getContractForEnvironment<T>(hre: HardhatRuntimeEnvironment, contractSlug: TContractSlug, signer?: string | Signer | undefined): Promise<T> {
-  return DEF_GET_CONTRACT_FOR_ENVIRONMENT[contractSlug](hre, contractSlug, signer);
+async function getContractForEnvironment<T>(
+  hre: HardhatRuntimeEnvironment,
+  contractSlug: TContractSlug,
+  signer?: string | Signer | undefined
+): Promise<T> {
+  return DEF_GET_CONTRACT_FOR_ENVIRONMENT[contractSlug](
+    hre,
+    contractSlug,
+    signer
+  );
 }
-export type {
-  TContractSlug,
-}
-export {
-  getContractForEnvironment,
-}
+export type {TContractSlug};
+export {getContractForEnvironment};

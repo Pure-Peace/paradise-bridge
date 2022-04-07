@@ -1,12 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
-contract BridgeERC20 is Context, AccessControlEnumerable, IERC20, IERC20Metadata {
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+
+contract BridgeERC20 is
+    Initializable,
+    ContextUpgradeable,
+    AccessControlEnumerableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    IERC20Upgradeable,
+    IERC20MetadataUpgradeable
+{
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -20,13 +30,18 @@ contract BridgeERC20 is Context, AccessControlEnumerable, IERC20, IERC20Metadata
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor(
+    function initialize(
         string memory name_,
         string memory symbol_,
         uint8 decimals_,
         uint256 maxSupply_,
         address minter_
-    ) {
+    ) external initializer {
+        __Context_init_unchained();
+        __ERC165_init_unchained();
+        __AccessControl_init_unchained();
+        __AccessControlEnumerable_init_unchained();
+
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;

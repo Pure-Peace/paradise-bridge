@@ -21,6 +21,7 @@ import {
 } from './constants';
 
 import NETWORK_DEPLOY_CONFIG, {DeployConfig} from '../deploy.config';
+import {BridgeERC20} from '../typechain';
 
 require('dotenv').config();
 const prompts = require('prompts');
@@ -283,15 +284,53 @@ export async function getDeployedContracts(deployer: SignerWithAddress) {
   return {ParadiseBridge};
 }
 
+export async function deployUpgradeableContract(
+  deploy: DeployFunction,
+  contractName: string,
+  rename?: string
+) {
+  const implReuslt = await deploy(
+    `Impl${rename || contractName}`,
+    contractName
+  );
+  const upBeaconResult = await deploy(
+    `UpBeacon${rename || contractName}`,
+    'UpgradeableBeacon',
+    [implReuslt.address]
+  );
+  const proxyResult = await deploy(
+    `${rename || contractName}Proxy`,
+    'BeaconProxy',
+    [implReuslt.address, []]
+  );
+  return {implReuslt, upBeaconResult, proxyResult};
+}
+
+export async function tryInitializeUpgradeableContract<
+  T extends Contract,
+  A extends any[]
+>(contract: T, initializeArgs: A) {
+  try {
+    await contract.callStatic.initialize.call(initializeArgs);
+    console.log('Initializing...');
+    await waitContractCall(await contract.initialize.call(initializeArgs));
+  } catch (err) {
+    console.log('Already initialized or initialize error:', err);
+  }
+}
+
 export async function deployAndSetupContracts() {
   const {deployer, deploy} = await setup();
+
+  await deployUpgradeableContract(deploy, 'ParadiseBridge');
+  const {ParadiseBridge} = await getDeployedContracts(deployer);
   const {bridgeRunningStatus, globalFeeStatus, feeRecipient} = deployConfig();
-  await deploy('ParadiseBridge', 'ParadiseBridge', [
+  await tryInitializeUpgradeableContract(ParadiseBridge, [
     bridgeRunningStatus,
     globalFeeStatus,
     feeRecipient,
   ]);
-  const {ParadiseBridge} = await getDeployedContracts(deployer);
+
   await grantBridgeApprovers(deployer, ParadiseBridge);
   await deployBridgeERC20TokensForBridge(deploy, ParadiseBridge);
   const bridgeERC20TokensDict = getBridgeERC20TokensLocal();
@@ -413,7 +452,19 @@ async function deployBridgeERC20TokensForBridge(
 
   const bridgeERC20Deployments: {[key: string]: DeployResult} = {};
   for (const cfg of bridgeERC20DeployConfigs) {
-    bridgeERC20Deployments[cfg.name] = await deploy(cfg.name, 'BridgeERC20', [
+    const {proxyResult} = await deployUpgradeableContract(
+      deploy,
+      'BridgeERC20',
+      cfg.name
+    );
+
+    bridgeERC20Deployments[cfg.name] = proxyResult;
+    const token = await getContractAt<BridgeERC20>(
+      'BridgeERC20',
+      proxyResult.address
+    );
+
+    await tryInitializeUpgradeableContract(token, [
       cfg.name,
       cfg.symbol,
       cfg.decimals,

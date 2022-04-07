@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {TokensHelper} from "./lib/TokensHelper.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
+import {TokensHelper} from "./lib/TokensHelper.sol";
+
+contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, ReentrancyGuardUpgradeable {
     /**
      * @dev Token bridging configuration
      */
@@ -103,6 +106,11 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
      */
     event BridgeFeeUpdated(address indexed token, uint256 newFee);
 
+    /**
+     * @dev Emit when admin migrates bridge assets
+     */
+    event BridgeAssetsMigrated(address indexed operator, address indexed token, uint256 amount);
+
     bytes32 public constant BRIDGE_APPROVER_ROLE = keccak256("BRIDGE_APPROVER_ROLE");
 
     mapping(bytes32 => BridgeableTokensConfig) private _bridgeableTokens;
@@ -143,11 +151,17 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         _;
     }
 
-    constructor(
+    function initialize(
         bool _bridgeRunningStatus,
         bool _globalFeeStatus,
         address _feeRecipient
-    ) {
+    ) external nonReentrant initializer {
+        __Context_init_unchained();
+        __ReentrancyGuard_init_unchained();
+        __ERC165_init_unchained();
+        __AccessControl_init_unchained();
+        __AccessControlEnumerable_init_unchained();
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(BRIDGE_APPROVER_ROLE, DEFAULT_ADMIN_ROLE);
 
@@ -431,5 +445,21 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
      */
     function setGlobalFeeStatus(bool newFeeStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
         globalFeeStatus = newFeeStatus;
+    }
+
+    /**
+     * @dev Allow administrators to migrate bridge assets (Native tokens)
+     */
+    function migrateAssets(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        TokensHelper.safeTransferNativeTokens(msg.sender, amount);
+        emit BridgeAssetsMigrated(msg.sender, address(0), amount);
+    }
+
+    /**
+     * @dev Allow administrators to migrate bridge assets (ERC20)
+     */
+    function migrateAssets(address token, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        TokensHelper.safeTransfer(token, msg.sender, amount);
+        emit BridgeAssetsMigrated(msg.sender, token, amount);
     }
 }
