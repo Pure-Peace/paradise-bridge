@@ -301,22 +301,23 @@ export async function deployUpgradeableContract(
   const proxyResult = await deploy(
     `${rename || contractName}Proxy`,
     'BeaconProxy',
-    [implReuslt.address, []]
+    [upBeaconResult.address, []]
   );
   return {implReuslt, upBeaconResult, proxyResult};
 }
 
-export async function tryInitializeUpgradeableContract<
-  T extends Contract,
-  A extends any[]
->(contract: T, initializeArgs: A) {
+export async function tryInitializeUpgradeableContract<T extends Contract>(
+  contract: T,
+  initializeArgs: any[]
+) {
   try {
-    await contract.callStatic.initialize.call(initializeArgs);
-    console.log('Initializing...');
-    await waitContractCall(await contract.initialize.call(initializeArgs));
+    await contract.callStatic.initialize(...initializeArgs);
   } catch (err) {
-    console.log('Already initialized or initialize error:', err);
+    console.log('Already initialized or initialize error');
   }
+
+  console.log('Initializing...');
+  await waitContractCall(await contract.initialize(...initializeArgs));
 }
 
 export async function deployAndSetupContracts() {

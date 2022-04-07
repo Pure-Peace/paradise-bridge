@@ -10,6 +10,9 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {TokensHelper} from "./lib/TokensHelper.sol";
 
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+
 contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, ReentrancyGuardUpgradeable {
     /**
      * @dev Token bridging configuration
