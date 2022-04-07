@@ -285,9 +285,10 @@ export async function getDeployedContracts(deployer: SignerWithAddress) {
 
 export async function deployAndSetupContracts() {
   const {deployer, deploy} = await setup();
-  const {bridgeRunningStatus, feeRecipient} = deployConfig();
+  const {bridgeRunningStatus, globalFeeStatus, feeRecipient} = deployConfig();
   await deploy('ParadiseBridge', 'ParadiseBridge', [
     bridgeRunningStatus,
+    globalFeeStatus,
     feeRecipient,
   ]);
   const {ParadiseBridge} = await getDeployedContracts(deployer);

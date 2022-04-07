@@ -60,8 +60,10 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     mapping(bytes32 => BridgeableTokensConfig) private _bridgeableTokens;
     mapping(address => BridgeApprovalConfig) public bridgeApprovalConfig;
 
-    bool public bridgeIsRunning;
     address public feeRecipient;
+
+    bool public bridgeIsRunning;
+    bool public globalFeeStatus;
 
     modifier checkTokenAddress(address token) {
         require(Address.isContract(token), "invalid token address");
@@ -83,11 +85,17 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         _;
     }
 
-    constructor(bool _bridgeRunningStatus, address _feeRecipient) {
+    constructor(
+        bool _bridgeRunningStatus,
+        bool _globalFeeStatus,
+        address _feeRecipient
+    ) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setRoleAdmin(BRIDGE_APPROVER_ROLE, DEFAULT_ADMIN_ROLE);
 
         _setBridgeRunningStatus(_bridgeRunningStatus);
+        globalFeeStatus = _globalFeeStatus;
+
         _setFeeRecipient(_feeRecipient);
     }
 
@@ -136,9 +144,24 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     }
 
     function _setFeeRecipient(address newRecipient) internal {
+        require(newRecipient != address(0) && newRecipient != address(this), "invalid fees recipient");
         address oldRecipient = feeRecipient;
         feeRecipient = newRecipient;
         emit FeeRecipientChanged(newRecipient, oldRecipient);
+    }
+
+    function _setBridgeFee(
+        address _token,
+        uint256 _chainId,
+        uint256 fee
+    ) internal {
+        BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[_encodeTokenWithChainId(_token, _chainId)];
+        require(
+            (fee < _tokenConfig.maxBridgeAmount) &&
+                ((_tokenConfig.maxBridgeAmount - fee) >= _tokenConfig.minBridgeAmount),
+            "invalid fee config"
+        );
+        _tokenConfig.bridgeFee = fee;
     }
 
     /**
@@ -161,7 +184,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
         require(_tokenConfig.enabled, "token is not bridgeable");
         require(amount > _tokenConfig.bridgeFee, "bridge amount should be greater than fees");
 
-        if (feeRecipient != address(0) && _tokenConfig.bridgeFee > 0) {
+        if (globalFeeStatus && _tokenConfig.bridgeFee > 0) {
             TokensHelper.safeTransferFrom(token, msg.sender, feeRecipient, _tokenConfig.bridgeFee);
             amount -= _tokenConfig.bridgeFee;
         }
@@ -282,6 +305,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
             if (configs[i].maxBridgeAmount == 0) {
                 configs[i].maxBridgeAmount = type(uint256).max;
             }
+            require(configs[i].maxBridgeAmount > configs[i].minBridgeAmount, "invalid bridge amount limit");
             _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)] = configs[i];
         }
     }
@@ -296,8 +320,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     {
         for (uint256 i; i < tokensOnChain.length; i++) {
             _checkTokenAddress(tokensOnChain[i].token);
-            _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)]
-                .bridgeFee = fees[i];
+            _setBridgeFee(tokensOnChain[i].token, tokensOnChain[i].chainId, fees[i]);
         }
     }
 
@@ -336,5 +359,9 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
      */
     function setFeeRecipient(address newRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setFeeRecipient(newRecipient);
+    }
+
+    function setGlobalFeeStatus(bool newFeeStatus) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        globalFeeStatus = newFeeStatus;
     }
 }

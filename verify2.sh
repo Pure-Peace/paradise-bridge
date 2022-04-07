@@ -1,1 +1,1 @@
-yarn hardhat verify --network bscTestnet --constructor-args arguments.js 0xc526f065c6a9Fc54A9495861B3807F58aA63565d
+yarn hardhat verify --network rinkeby --constructor-args arguments.js 0xe7d1AaaeEc2357dDA5fe58f77620BE24e95e5d1E

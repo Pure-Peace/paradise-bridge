@@ -26,6 +26,7 @@ export type BridgeERC20DeployConfig = {
 
 export type DeployConfig = {
   bridgeRunningStatus: boolean;
+  globalFeeStatus: boolean;
   feeRecipient: string;
   bridgeApprovers: string[];
   bridgeableTokens: BridgeableToken[];
@@ -50,6 +51,7 @@ const RINKEBY_CHAIN_ID = 4;
 const config: {[key: string]: DeployConfig} = {
   rinkeby: {
     bridgeRunningStatus: true,
+    globalFeeStatus: true,
     feeRecipient: PARADISE_BRIDGE_FEE_RECIPIENT,
     bridgeApprovers: ['deployer'],
     bridgeableTokens: [
@@ -90,6 +92,7 @@ const config: {[key: string]: DeployConfig} = {
   },
   paradise: {
     bridgeRunningStatus: true,
+    globalFeeStatus: true,
     feeRecipient: PARADISE_BRIDGE_FEE_RECIPIENT,
     bridgeApprovers: ['deployer'],
     bridgeableTokens: [
@@ -130,6 +133,7 @@ const config: {[key: string]: DeployConfig} = {
   },
   bscTestnet: {
     bridgeRunningStatus: true,
+    globalFeeStatus: true,
     feeRecipient: PARADISE_BRIDGE_FEE_RECIPIENT,
     bridgeApprovers: ['deployer'],
     bridgeableTokens: [
