@@ -84,10 +84,9 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     /**
      * @dev Emit when the native token is deposited on the bridge
-     * @param chainId The chain id where the bridge contract is located.
      * @param amount Deposit amount.
      */
-    event TokensDeposit(uint256 indexed chainId, address indexed from, uint256 amount);
+    event TokensDeposit(address indexed from, uint256 amount);
 
     /**
      * @dev Emit when fee recipient changes
@@ -415,7 +414,7 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
      * @dev Deposit native tokens to bridge
      */
     function depositNativeTokens() external payable {
-        emit TokensDeposit(chainId(), msg.sender, msg.value);
+        emit TokensDeposit(msg.sender, msg.value);
     }
 
     /**
