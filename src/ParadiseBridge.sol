@@ -92,12 +92,17 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     /**
      * @dev Emit when fee recipient changes
      */
-    event FeeRecipientChanged(address indexed newRecipient, address indexed oldRecipient);
+    event FeeRecipientChanged(address indexed newRecipient);
 
     /**
      * @dev Emit when bridge running status changes
      */
-    event BridgeRunningStatusChanged(bool indexed newRunningStatus, bool indexed oldRunningStatus);
+    event BridgeRunningStatusChanged(bool indexed newRunningStatus);
+
+    /**
+     * @dev Emit when token bridge fee updated
+     */
+    event BridgeFeeUpdated(address indexed token, uint256 newFee);
 
     bytes32 public constant BRIDGE_APPROVER_ROLE = keccak256("BRIDGE_APPROVER_ROLE");
 
@@ -188,9 +193,8 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
     }
 
     function _setBridgeRunningStatus(bool newRunningStatus) internal {
-        bool oldRunningStatus = bridgeIsRunning;
         bridgeIsRunning = newRunningStatus;
-        emit BridgeRunningStatusChanged(newRunningStatus, oldRunningStatus);
+        emit BridgeRunningStatusChanged(newRunningStatus);
     }
 
     /**
@@ -203,23 +207,26 @@ contract ParadiseBridge is AccessControlEnumerable, ReentrancyGuard {
 
     function _setFeeRecipient(address newRecipient) internal {
         require(newRecipient != address(0) && newRecipient != address(this), "invalid fees recipient");
-        address oldRecipient = feeRecipient;
         feeRecipient = newRecipient;
-        emit FeeRecipientChanged(newRecipient, oldRecipient);
+        emit FeeRecipientChanged(newRecipient);
     }
 
     function _setBridgeFee(
         address _token,
         uint256 _chainId,
-        uint256 fee
+        uint256 newFee
     ) internal {
         BridgeableTokensConfig storage _tokenConfig = _bridgeableTokens[_encodeTokenWithChainId(_token, _chainId)];
+        if (_tokenConfig.bridgeFee == newFee) return;
+
         require(
-            (fee < _tokenConfig.maxBridgeAmount) &&
-                ((_tokenConfig.maxBridgeAmount - fee) >= _tokenConfig.minBridgeAmount),
+            (newFee < _tokenConfig.maxBridgeAmount) &&
+                ((_tokenConfig.maxBridgeAmount - newFee) >= _tokenConfig.minBridgeAmount),
             "invalid fee config"
         );
-        _tokenConfig.bridgeFee = fee;
+        _tokenConfig.bridgeFee = newFee;
+
+        emit BridgeFeeUpdated(_token, newFee);
     }
 
     /**
