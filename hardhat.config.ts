@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import { HardhatUserConfig } from 'hardhat/types';
+import {HardhatUserConfig} from 'hardhat/types';
 import 'hardhat-deploy';
 import '@nomiclabs/hardhat-ethers';
-import "@nomiclabs/hardhat-waffle";
-import "@nomiclabs/hardhat-etherscan";
+import '@nomiclabs/hardhat-waffle';
+import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-contract-sizer';
 import 'hardhat-gas-reporter';
 import '@typechain/hardhat';
@@ -11,13 +11,12 @@ import 'solidity-coverage';
 import 'hardhat-docgen';
 import 'hardhat-abi-exporter';
 //import "@atixlabs/hardhat-time-n-mine";
-import { node_url, accounts } from './utils/network';
+import {node_url, accounts} from './utils/network';
 
 // While waiting for hardhat PR: https://github.com/nomiclabs/hardhat/pull/1542
 if (process.env.HARDHAT_FORK) {
   process.env['HARDHAT_DEPLOY_FORK'] = process.env.HARDHAT_FORK;
 }
-
 
 const config = {
   solidity: {
@@ -27,10 +26,10 @@ const config = {
         enabled: true,
         runs: 200,
       },
-    }
+    },
   },
   namedAccounts: {
-    deployer: 0
+    deployer: 0,
   },
   networks: {
     hardhat: {
@@ -40,12 +39,12 @@ const config = {
       accounts: accounts(process.env.HARDHAT_FORK),
       forking: process.env.HARDHAT_FORK
         ? {
-          // TODO once PR merged : network: process.env.HARDHAT_FORK,
-          url: node_url(process.env.HARDHAT_FORK),
-          blockNumber: process.env.HARDHAT_FORK_NUMBER
-            ? parseInt(process.env.HARDHAT_FORK_NUMBER)
-            : undefined,
-        }
+            // TODO once PR merged : network: process.env.HARDHAT_FORK,
+            url: node_url(process.env.HARDHAT_FORK),
+            blockNumber: process.env.HARDHAT_FORK_NUMBER
+              ? parseInt(process.env.HARDHAT_FORK_NUMBER)
+              : undefined,
+          }
         : undefined,
     },
     localhost: {
@@ -87,7 +86,11 @@ const config = {
     bscTestnet: {
       url: node_url('bscTestnet'),
       accounts: accounts('bscTestnet'),
-    }
+    },
+    bsc: {
+      url: node_url('bsc'),
+      accounts: accounts('bsc'),
+    },
   },
   etherscan: {
     apiKey: {
@@ -96,9 +99,9 @@ const config = {
       rinkeby: process.env.ETHERSCAN_API_KEYS,
       goerli: process.env.ETHERSCAN_API_KEYS,
       kovan: process.env.ETHERSCAN_API_KEYS,
-      bscTestnet: process.env.ETHERSCAN_API_KEYS_BSC
+      bscTestnet: process.env.ETHERSCAN_API_KEYS_BSC,
+      bsc: process.env.ETHERSCAN_API_KEYS_BSC,
     },
-
   },
   paths: {
     sources: 'src',
@@ -134,7 +137,7 @@ const config = {
     flat: true,
     spacing: 2,
     pretty: true,
-  }
+  },
 };
 
 export default config;
