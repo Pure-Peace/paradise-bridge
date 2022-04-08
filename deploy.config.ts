@@ -40,7 +40,7 @@ const toTokenAmount = (amount: BigNumberish, tokenDecimal: BigNumberish) => {
 };
 
 const NATIVE_TOKEN = ZERO_ADDRESS;
-const PARADISE_TOKEN_MAINNET = '0x1E203f360B594CB537879cb234F41EBf4D8bc76e';
+const PARADISE_TOKEN_RINKEBY = '0xc526f065c6a9Fc54A9495861B3807F58aA63565d';
 const PARADISE_BRIDGE_FEE_RECIPIENT =
   '0x686E797117ba23b30aA07AAdF82ba8A0B329948b';
 
@@ -56,7 +56,7 @@ const config: {[key: string]: DeployConfig} = {
     bridgeApprovers: ['deployer'],
     bridgeableTokens: [
       {
-        token: PARADISE_TOKEN_MAINNET,
+        token: PARADISE_TOKEN_RINKEBY,
         targetChainId: PARADISE_CHAIN_ID,
         config: {
           enabled: true,
@@ -67,7 +67,7 @@ const config: {[key: string]: DeployConfig} = {
         },
       },
       {
-        token: PARADISE_TOKEN_MAINNET,
+        token: PARADISE_TOKEN_RINKEBY,
         targetChainId: BSC_TESTNET_CHAIN_ID,
         config: {
           enabled: true,
@@ -80,7 +80,7 @@ const config: {[key: string]: DeployConfig} = {
     ],
     bridgeApprovalConfigs: [
       {
-        token: PARADISE_TOKEN_MAINNET,
+        token: PARADISE_TOKEN_RINKEBY,
         config: {
           enabled: true,
           transfer: true,
