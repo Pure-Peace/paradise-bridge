@@ -114,6 +114,24 @@ contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, Re
      */
     event BridgeAssetsMigrated(address indexed operator, address indexed token, uint256 amount);
 
+    /**
+     * @dev Emit when bridgeable token updated
+     */
+    event BridgeableTokenUpdated(
+        address indexed token,
+        uint256 indexed targetChain,
+        bool enable,
+        bool burn,
+        uint256 minBridgeAmount,
+        uint256 maxBridgeAmount,
+        uint256 bridgeFee
+    );
+
+    /**
+     * @dev Emit when bridge approval config updated
+     */
+    event BridgeApprovalConfigUpdated(address indexed token, bool enabled, bool transfer);
+
     bytes32 public constant BRIDGE_APPROVER_ROLE = keccak256("BRIDGE_APPROVER_ROLE");
 
     mapping(bytes32 => BridgeableTokensConfig) private _bridgeableTokens;
@@ -388,6 +406,15 @@ contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, Re
             }
             require(configs[i].maxBridgeAmount > configs[i].minBridgeAmount, "invalid bridge amount limit");
             _bridgeableTokens[_encodeTokenWithChainId(tokensOnChain[i].token, tokensOnChain[i].chainId)] = configs[i];
+            emit BridgeableTokenUpdated(
+                tokensOnChain[i].token,
+                tokensOnChain[i].chainId,
+                configs[i].enabled,
+                configs[i].burn,
+                configs[i].minBridgeAmount,
+                configs[i].maxBridgeAmount,
+                configs[i].bridgeFee
+            );
         }
     }
 
@@ -416,6 +443,7 @@ contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, Re
         for (uint256 i; i < tokenAddresses.length; i++) {
             _checkTokenAddress(tokenAddresses[i]);
             bridgeApprovalConfig[tokenAddresses[i]] = configs[i];
+            emit BridgeApprovalConfigUpdated(tokenAddresses[i], configs[i].enabled, configs[i].transfer);
         }
     }
 
