@@ -90,6 +90,7 @@
     "deploy-dev": "node ./_scripts.js deploy",
     "deploy-prod": "node ./_scripts.js deploy-prod",
     "upgrade-cli": "node ./_scripts.js upgrade-cli",
-    "size": "hardhat size-contracts"
+    "size": "hardhat size-contracts",
+    "verify": "node ./_scripts.js verify-contracts"
   }
 }
