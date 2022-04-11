@@ -2,16 +2,6 @@
 pragma solidity ^0.8.0;
 
 library TokensHelper {
-    enum TransferErrors {
-        TransferFailed,
-        TransferFromFailed,
-        TransferNativeFailed
-    }
-
-    error ApproveFailed();
-    error TransferFailed(TransferErrors);
-    error TokenMintingFailed();
-
     function safeApprove(
         address token,
         address to,
@@ -19,7 +9,7 @@ library TokensHelper {
     ) internal {
         // bytes4(keccak256(bytes("approve(address,uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x095ea7b3, to, value));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert ApproveFailed();
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeApprove: approve failed");
     }
 
     function safeTransfer(
@@ -29,8 +19,7 @@ library TokensHelper {
     ) internal {
         // bytes4(keccak256(bytes("transfer(address,uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool)))))
-            revert TransferFailed(TransferErrors.TransferFailed);
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeTransfer: transfer failed");
     }
 
     function safeTransferFrom(
@@ -41,13 +30,12 @@ library TokensHelper {
     ) internal {
         // bytes4(keccak256(bytes("transferFrom(address,address,uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool)))))
-            revert TransferFailed(TransferErrors.TransferFromFailed);
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeTransferFrom: transfer failed");
     }
 
     function safeTransferNativeTokens(address to, uint256 value) internal {
         (bool success, ) = to.call{value: value}(new bytes(0));
-        if (!success) revert TransferFailed(TransferErrors.TransferNativeFailed);
+        require(success, "safeTransferNativeTokens: transfer failed");
     }
 
     function safeMint(
@@ -57,16 +45,13 @@ library TokensHelper {
     ) internal {
         // bytes4(keccak256(bytes("mint(address,uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x40c10f19, to, amount));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert TokenMintingFailed();
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeMint: mint failed");
     }
 
-    function safeBurn(
-        address token,
-        uint256 amount
-    ) internal {
+    function safeBurn(address token, uint256 amount) internal {
         // bytes4(keccak256(bytes("burn(uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x42966c68, amount));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert TokenMintingFailed();
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeBurn: burn failed");
     }
 
     function safeBurnFrom(
@@ -76,6 +61,6 @@ library TokensHelper {
     ) internal {
         // bytes4(keccak256(bytes("burnFrom(address,uint256)")));
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x79cc6790, from, amount));
-        if (!(success && (data.length == 0 || abi.decode(data, (bool))))) revert TokenMintingFailed();
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "safeBurnFrom: burn failed");
     }
 }
