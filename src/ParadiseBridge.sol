@@ -481,7 +481,7 @@ contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, Re
     /**
      * @dev Allow administrators to migrate bridge assets (Native tokens)
      */
-    function migrateAssets(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function migrateAssets(uint256 amount) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
         TokensHelper.safeTransferNativeTokens(msg.sender, amount);
         emit BridgeAssetsMigrated(msg.sender, address(0), amount);
     }
@@ -489,8 +489,18 @@ contract ParadiseBridge is Initializable, AccessControlEnumerableUpgradeable, Re
     /**
      * @dev Allow administrators to migrate bridge assets (ERC20)
      */
-    function migrateAssets(address token, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function migrateAssets(address token, uint256 amount) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
         TokensHelper.safeTransfer(token, msg.sender, amount);
         emit BridgeAssetsMigrated(msg.sender, token, amount);
+    }
+
+    /**
+     * @dev Allow administrators to batch migrate bridge assets (ERC20)
+     */
+    function migrateAssets(address[] memory tokens, uint256 amount) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i; i < tokens.length; i++) {
+            TokensHelper.safeTransfer(tokens[i], msg.sender, amount);
+            emit BridgeAssetsMigrated(msg.sender, tokens[i], amount);
+        }
     }
 }
